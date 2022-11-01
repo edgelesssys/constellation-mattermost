@@ -1,0 +1,17 @@
+apiVersion: v2
+name: mm-app
+description: A Helm chart to deploy a mattermost application for a given environment.
+type: application
+version: 0.1.1
+appVersion: "1.16.0"
+
+dependencies: # A list of the chart requirements (optional)
+  - name: minio-tenant
+    version: "0.1.0"
+    condition: mattermost.enabled
+  - name: mattermost
+    version: "0.1.0"
+    condition: mattermost.enabled
+  - name: postgres-cluster
+    version: "0.1.0"
+    condition: postgres-cluster.enabled

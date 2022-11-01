@@ -1,0 +1,38 @@
+apiVersion: installation.mattermost.com/v1beta1
+kind: Mattermost
+metadata:
+  name: mattermost
+spec:
+  size: {{ .Values.size }}
+  ingress:
+    enabled: false
+  mattermostEnv:
+    - name: MM_LOGSETTINGS_CONSOLELEVEL
+      value: "DEBUG"
+    - name: MM_FILESETTINGS_AMAZONS3SSL
+      value: 'false'
+    - name: MM_SERVICESETTINGS_SITEURL
+      {{- if eq .Values.environment "prod" }}
+      value: https://{{ .Values.hostname }}/
+      {{- else if eq .Values.environment "staging" }}
+      value: https://staging.{{ .Values.hostname }}/
+      {{- end }}
+  image: mattermost/mattermost-team-edition
+  imagePullPolicy: IfNotPresent
+  version: 7.3.0
+  database:
+    external:
+      secret: mm-postgres-connection
+  fileStore:
+    external:
+      url: minio.{{ .Release.Namespace }}.svc.cluster.local
+      bucket: {{ .Values.global.mainBucket }}
+      secret: storage-user
+  # minio:
+  #   secret: storage-user
+  # mattermostEnv:
+  #   - name: POSTGRES_DBUSER_PW
+  #     valueFrom:
+  #       secretKeyRef:
+  #         key: password
+  #         name: mm-user.{{ .Values.global.teamId }}-mattermost-sql-cluster.credentials.postgresql.acid.zalan.do

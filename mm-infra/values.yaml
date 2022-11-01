@@ -1,0 +1,31 @@
+# Use top-level keys with a dependencies name in order to overwrite values.yaml of a dependency.
+# To install any of the dependencies set the respective tag to true.
+
+# enables the subchart
+certManager:
+  enabled: false
+# configures the subchart
+cert-manager:
+  installCRDs: true
+
+# enables the subchart. Necessary since some template are accessing the value.
+# When accessing values in template '-' is not allowed as part of value names.
+postgresOperator:
+  enabled: false
+# configures the subchart
+postgres-operator:
+  configKubernetes:
+    watched_namespace: "*"
+    pod_environment_secret: minio-backup-secret
+    pod_environment_configmap: psql-op/postgres-backup-config
+ingressNginx:
+  enabled: false
+azurediskCsiDriver:
+  enabled: false
+  linux.distro: "fedora"
+  controller.replicas: 1
+mattermostOperator:
+  enabled: false
+
+# Has to be set here because the psql operator will inject a backup config into each cluster.
+backupBucket: psql-backups

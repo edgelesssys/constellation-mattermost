@@ -1,0 +1,16 @@
+{{ if .Values.postgresOperator.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+    name: postgres-backup-config
+data:
+    # Once per day at 02:47 am.
+    BACKUP_SCHEDULE: '47 2 * * *'
+    USE_WALG_BACKUP: "true"
+    USE_WALG_RESTORE: "true"
+    BACKUP_NUM_TO_RETAIN: "10"
+    WALG_DISABLE_S3_SSE: "true"
+    # AWS_S3_FORCE_PATH_STYLE: "true"
+    WALE_S3_ENDPOINT: http://minio:80
+    WAL_S3_BUCKET: {{ .Values.backupBucket }}
+{{ end }}

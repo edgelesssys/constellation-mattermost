@@ -1,0 +1,39 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: external-dns
+  namespace: external-dns
+spec:
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: external-dns
+  template:
+    metadata:
+      labels:
+        app: external-dns
+    spec:
+      serviceAccountName: external-dns
+      containers:
+      - name: external-dns
+        image: k8s.gcr.io/external-dns/external-dns:v0.12.2
+        args:
+        - --source=ingress # service is also possible
+        - --domain-filter=edgeless.systems # (optional) limit to only example.com domains; change to match the zone created above.
+        - --provider=godaddy
+        - --godaddy-api-key=$(GODADDY_API_KEY)
+        - --godaddy-api-secret=$(GODADDY_SECRET_KEY)
+        env:
+        - name: GODADDY_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: godaddy-access
+              key: apikey
+              optional: false
+        - name: GODADDY_SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: godaddy-access
+              key: secretkey
+              optional: false

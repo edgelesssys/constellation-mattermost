@@ -1,0 +1,22 @@
+apiVersion: v1
+kind: Secret
+metadata:
+  name: storage-user
+type: Opaque
+stringData:
+  # Needed for minio operator to correctly create tenant user.
+  CONSOLE_ACCESS_KEY: {{ .Values.accessId }}
+  CONSOLE_SECRET_KEY: {{ .Values.accessSecret }}
+  # Needed for mattermost operator to be able to create mattermost deployment.
+  accesskey: {{ .Values.accessId }}
+  secretkey: {{ .Values.accessSecret }}
+---
+# Secret to allow postgres cluster to access backup minio container.
+apiVersion: v1
+kind: Secret
+metadata:
+  name: minio-backup-user
+type: Opaque
+stringData:
+  CONSOLE_ACCESS_KEY: {{ .Values.global.backupAccessId }}
+  CONSOLE_SECRET_KEY: {{ .Values.global.backupAccessSecret }}

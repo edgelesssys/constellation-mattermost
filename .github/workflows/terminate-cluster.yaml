@@ -1,0 +1,20 @@
+name: "Terminate Constellation Cluster"
+on:
+  workflow_dispatch:
+
+jobs:
+  create:
+    name: "Terminate cluster"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Setup Constellation CLI
+        shell: bash
+        run: |
+          curl -sL https://github.com/edgelesssys/constellation/releases/download/v2.0.0/constellation-linux-amd64 -o constellation-cli
+          chmod +x constellation-cli
+          echo '127.0.0.1 license.confidential.cloud' >> /etc/hosts
+
+      - name: Terminate cluster
+        shell: bash
+        run: |
+          ./constellation-cli terminate

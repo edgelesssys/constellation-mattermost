@@ -1,0 +1,6 @@
+apiVersion: v2
+name: external-dns
+description: A Helm chart to deploy external-dns. Should only be deployed once per cluster.
+type: application
+version: 0.1.0
+appVersion: "0.1.0"

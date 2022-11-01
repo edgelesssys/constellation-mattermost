@@ -1,0 +1,69 @@
+name: "Deploy mattermost app"
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Which environment to deploy to."
+        type: choice
+        options:
+          - "staging"
+          - "prod"
+        default: "staging"
+        required: true
+      deployDb:
+        description: "Deploy a DB?"
+        type: boolean
+        default: true
+        required: true
+jobs:
+  create:
+    name: "Deploy mattermost app"
+    runs-on: ubuntu-latest
+    environment:
+      name: ${{ inputs.environment }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Setup kubeconf
+        shell: bash
+        run: |
+          echo $KUBEADM | base64 -d > ./constellation-admin.conf
+        env:
+          KUBEADM: ${{ secrets.KUBEADM_CONF }}
+
+      - name: Setup Helm
+        uses: azure/setup-helm@v3
+        with:
+          version: 'v3.9.0' # default is latest (stable)
+
+      - name: Deploy
+        shell: bash
+        run: |
+          helm dependency update mm-infra
+          helm upgrade ${{ inputs.environment }} --install --set mattermost.environment=${{ inputs.environment }} --set mattermost.enabled=true --set minio-tenant.rootPassword=$MINIO_ROOT_PW --set minio-tenant.accessId=$MINIO_DEFAULT_USER_NAME --set minio-tenant.accessSecret=$MINIO_DEFAULT_USER_SECRET --set global.backupAccessId=$MINIO_BACKUP_ACCESS_ID --set global.backupAccessSecret=$MINIO_BACKUP_ACCESS_SECRET --create-namespace --namespace ${{ inputs.environment }} mm-app
+        env:
+          KUBECONFIG: "./constellation-admin.conf"
+          MINIO_DEFAULT_USER_NAME: ${{ secrets.MINIO_DEFAULT_USER_NAME }}
+          MINIO_DEFAULT_USER_SECRET: ${{ secrets.MINIO_DEFAULT_USER_SECRET }}
+          MINIO_BACKUP_ACCESS_ID: ${{ secrets.MINIO_BACKUP_USER }}
+          MINIO_BACKUP_ACCESS_SECRET: ${{ secrets.MINIO_BACKUP_SECRET }}
+          MINIO_ROOT_PW: ${{ secrets.MINIO_DEFAULT_ROOT_PW }}
+
+      - name: Deploy
+        shell: bash
+        run: |
+          helm dependency update mm-infra
+          helm upgrade ${{ inputs.environment }}-db --install --set postgres-cluster.enabled=true --set global.backupAccessId=$MINIO_BACKUP_ACCESS_ID --set global.backupAccessSecret=$MINIO_BACKUP_ACCESS_SECRET --namespace ${{ inputs.environment }} mm-app
+        if: ${{ inputs.deployDb }}
+        env:
+          KUBECONFIG: "./constellation-admin.conf"
+          MINIO_BACKUP_ACCESS_ID: ${{ secrets.MINIO_BACKUP_USER }}
+          MINIO_BACKUP_ACCESS_SECRET: ${{ secrets.MINIO_BACKUP_SECRET }}
+
+      - name: Update psql secret
+        uses: ./.github/actions/update-psql-secret
+        with:
+          namespace: ${{ inputs.environment }}
+        env:
+          KUBECONFIG: "./constellation-admin.conf"

@@ -1,0 +1,56 @@
+name: "Create Constellation Cluster"
+on:
+  workflow_dispatch:
+    inputs:
+      workerNodesCount:
+        description: "Number of worker nodes to spawn."
+        default: "2"
+        required: true
+      controlNodesCount:
+        description: "Number of control-plane nodes to spawn."
+        default: "1"
+        required: true
+jobs:
+  create:
+    name: "Create cluster"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Setup Constellation CLI
+        shell: bash
+        run: |
+          curl -sL https://github.com/edgelesssys/constellation/releases/download/v2.0.0/constellation-linux-amd64 -o constellation
+          chmod +x constellation
+
+      # As described at:
+      # https://github.com/Azure/login#configure-deployment-credentials
+      - name: Login to Azure
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+
+      - name: Create cluster
+        shell: bash
+        run: |
+          yq eval -i "(.provider | select(. | has(\"azure\")).azure.clientSecretValue) = \"${{ secrets.AZ_CLIENT_SECRET }}\"" constellation-conf.yaml
+
+          cat ./constellation-conf.yaml
+          ./constellation create --control-plane-nodes ${{ github.event.inputs.controlNodesCount }} --worker-nodes ${{ github.event.inputs.workerNodesCount }} -y
+          echo $LICENSE > ./constellation.license
+          echo $MASTERSECRET > ./constellation-mastersecret.json
+          ./constellation --master-secret ./constellation-mastersecret.json init
+        env: # Or as an environment variable
+          LICENSE: ${{ secrets.COMMUNITY_LICENSE }}
+          MASTERSECRET: ${{ secrets.MASTERSECRET }}
+
+      - name: Upload constellation-state.json
+        uses: actions/upload-artifact@v3
+        with:
+          path: ./constellation-state.json
+      - name: Upload constellation-admin.conf
+        uses: actions/upload-artifact@v3
+        with:
+          path: ./constellation-admin.conf

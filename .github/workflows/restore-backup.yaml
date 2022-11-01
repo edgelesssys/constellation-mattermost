@@ -1,0 +1,57 @@
+name: "Restore SQL backup"
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Which environment to restore."
+        type: choice
+        options:
+          - "staging"
+          - "prod"
+        default: "staging"
+        required: true
+      timestamp:
+        description: "Select latest backup before this timestamp:"
+        type: string
+        default: "2022-12-01T12:40:33+01:00"
+        required: true
+jobs:
+  create:
+    name: "Deploy mattermost app"
+    runs-on: ubuntu-latest
+    environment:
+      name: ${{ inputs.environment }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Setup kubeconf
+        shell: bash
+        run: |
+          echo $KUBEADM | base64 -d > ./constellation-admin.conf
+        env:
+          KUBEADM: ${{ secrets.KUBEADM_CONF }}
+
+      - name: Setup Helm
+        uses: azure/setup-helm@v3
+        with:
+          version: 'v3.9.0' # default is latest (stable)
+
+      - name: Restore backup from this env
+        shell: bash
+        run: |
+          helm dependency update mm-app
+          export CLUSTER_UID=$(kubectl get pod edgeless-mattermost-sql-cluster-0 -n ${{ inputs.environment }} --template={{.metadata.uid}})
+          helm uninstall ${{ inputs.environment }}-db -n ${{ inputs.environment }} || echo "ignoring failures"
+          helm upgrade ${{ inputs.environment }}-db --install --atomic --set postgres-cluster.enabled=true --set postgres-cluster.restoreBackup=true --set postgres-cluster.timestamp=${{ github.event.inputs.timestamp }} --set postgres-cluster.uid=$CLUSTER_UID --namespace ${{ inputs.environment }} --set global.backupAccessId=$MINIO_BACKUP_ACCESS_ID --set global.backupAccessSecret=$MINIO_BACKUP_ACCESS_SECRET mm-app
+        env:
+          KUBECONFIG: "./constellation-admin.conf"
+          MINIO_BACKUP_ACCESS_ID: ${{ secrets.MINIO_BACKUP_USER }}
+          MINIO_BACKUP_ACCESS_SECRET: ${{ secrets.MINIO_BACKUP_SECRET }}
+
+      - name: Update psql secret
+        uses: ./.github/actions/update-psql-secret
+        with:
+          namespace: ${{ inputs.environment }}
+        env:
+          KUBECONFIG: "./constellation-admin.conf"

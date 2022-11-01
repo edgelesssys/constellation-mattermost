@@ -1,0 +1,3 @@
+poolDiskSize: 25Gi
+serverCount: 1
+volumesPerServer: 1

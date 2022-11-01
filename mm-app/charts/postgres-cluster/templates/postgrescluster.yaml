@@ -1,0 +1,63 @@
+apiVersion: "acid.zalan.do/v1"
+kind: postgresql
+metadata:
+  name: {{ .Values.global.teamId }}-mattermost-sql-cluster # name needs to start with 'teamid'
+spec:
+  dockerImage: registry.opensource.zalan.do/acid/spilo-14:2.1-p6
+  teamId: {{ .Values.global.teamId }}
+  numberOfInstances: 1
+  enableMasterLoadBalancer: false
+  enableReplicaLoadBalancer: false
+  enableConnectionPooler: false # enable/disable connection pooler deployment
+  enableReplicaConnectionPooler: false # set to enable connectionPooler for replica service
+  allowedSourceRanges: # load balancers' source ranges for both master and replica services
+    - 127.0.0.1/32
+  databases:
+    {{ .Values.global.dbName }}: {{ .Values.global.mmUser }}
+  postgresql:
+    version: "14"
+    parameters:
+      password_encryption: scram-sha-256
+  volume:
+    size: 10Gi
+    storageClass: {{ .Values.global.storageclass }}
+  enableShmVolume: true
+  resources:
+    requests:
+      cpu: 10m
+      memory: 100Mi
+    limits:
+      cpu: 500m
+      memory: 500Mi
+  patroni:
+    initdb:
+      encoding: "UTF8"
+      locale: "en_US.UTF-8"
+      data-checksums: "true"
+    ttl: 30
+    loop_wait: 10
+    retry_timeout: 10
+    synchronous_mode: false
+    synchronous_mode_strict: false
+    synchronous_node_count: 1
+    maximum_lag_on_failover: 33554432
+  initContainers:
+    - name: date
+      image: busybox
+      command: ["/bin/date"]
+  users: # Application/Robot users
+    mm_admin:
+      - superuser
+      - createdb
+    {{ .Values.global.mmUser }}: []
+  {{- if .Values.restoreBackup }}
+  clone:
+    uid: {{ .Values.uid }}
+    cluster: "edgeless-mattermost-sql-cluster"
+    timestamp: {{ .Values.timestamp }}
+    s3_wal_path: "s3://psql-backups/spilo/{{ .Release.Namespace }}-edgeless-mattermost-sql-cluster/wal/14/"
+    s3_endpoint: http://minio:80
+    s3_access_key_id: {{ .Values.global.backupAccessId }}
+    s3_secret_access_key: {{ .Values.global.backupAccessSecret }}
+    s3_force_path_style: true
+  {{- end }}

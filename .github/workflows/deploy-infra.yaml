@@ -1,0 +1,103 @@
+name: "Deploy infra components"
+on:
+  workflow_dispatch:
+    inputs:
+      chart:
+        description: "Which chart to deploy."
+        type: choice
+        options:
+          - "all"
+          - "storage-driver"
+          - "minio"
+          - "psql"
+          - "nginx"
+          - "cert-manager"
+          - "mm"
+          - "godaddy-secret"
+        default: "all"
+        required: true
+jobs:
+  create:
+    name: "Deploy infra components"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Setup kubeconf
+        shell: bash
+        run: |
+          echo $KUBEADM | base64 -d > ./constellation-admin.conf
+        env:
+          KUBEADM: ${{ secrets.KUBEADM_CONF }}
+
+      - name: Setup Helm
+        uses: azure/setup-helm@v3
+        with:
+          version: 'v3.9.0' # default is latest (stable)
+
+      - name: Deploy CSI driver
+        shell: bash
+        run: |
+          helm dependency update mm-infra
+          helm upgrade storage --install --atomic --set azurediskCsiDriver.enabled=true --create-namespace --namespace storage mm-infra
+        if: ${{ inputs.chart == 'all' || inputs.chart == 'storage-driver' }}
+        env:
+          KUBECONFIG: "./constellation-admin.conf"
+
+      - name: Deploy MinIO operator
+        shell: bash
+        run: |
+          wget -q https://github.com/minio/operator/releases/latest/download/kubectl-minio_linux_amd64.zip
+          sudo unzip -o kubectl-minio_linux_amd64.zip
+          sudo chmod +x ./kubectl-minio
+          export PATH=$PATH:$PWD
+          kubectl minio init
+        if: ${{ inputs.chart == 'all' || inputs.chart == 'minio' }}
+        env:
+          KUBECONFIG: "./constellation-admin.conf"
+
+      - name: Deploy PSQL Operator
+        shell: bash
+        run: |
+          helm dependency update mm-infra
+          helm upgrade psql-op --install --atomic --set postgresOperator.enabled=true --set minioRootPassword=$MINIO_ROOT_PW --set minioBackupAccessKeyProd=MINIO_BACKUP_ACCESS_ID_PROD --set minioBackupSecretKeyProd=MINIO_BACKUP_ACCESS_SECRET_PROD --set minioBackupAccessKeyStaging=MINIO_BACKUP_ACCESS_ID_STAGING --set minioBackupSecretKeyStaging=MINIO_BACKUP_ACCESS_SECRET_STAGING --create-namespace --namespace psql-op mm-infra
+        if: ${{ inputs.chart == 'all' || inputs.chart == 'psql' }}
+        env:
+          KUBECONFIG: "./constellation-admin.conf"
+          MINIO_BACKUP_ACCESS_ID_PROD: ${{ secrets.MINIO_BACKUP_USER_PROD }}
+          MINIO_BACKUP_ACCESS_SECRET_PROD: ${{ secrets.MINIO_BACKUP_SECRET_PROD }}
+          MINIO_BACKUP_ACCESS_ID_STAGING: ${{ secrets.MINIO_BACKUP_USER_STAGING }}
+          MINIO_BACKUP_ACCESS_SECRET_STAGING: ${{ secrets.MINIO_BACKUP_SECRET_STAGING }}
+          MINIO_ROOT_PW: ${{ secrets.MINIO_DEFAULT_ROOT_PW }}
+
+      - name: Deploy Nginx Ingress
+        shell: bash
+        run: |
+          helm dependency update mm-infra
+          helm upgrade nginx-ingress --install --atomic --set ingressNginx.enabled=true --create-namespace --namespace nginx-ingress mm-infra
+        if: ${{ inputs.chart == 'all' || inputs.chart == 'nginx' }}
+        env:
+          KUBECONFIG: "./constellation-admin.conf"
+
+      - name: Deploy cert-manager
+        shell: bash
+        run: |
+          helm dependency update mm-infra
+          helm upgrade cert-manager --install --set certManager.enabled=true --create-namespace --namespace cert-manager mm-infra
+          echo $GODADDY_CREDS | base64 -d > ./godaddy_creds
+          kubectl create secret generic godaddy-access --from-env-file=./godaddy_creds -n external-dns
+        if: ${{ inputs.chart == 'all' || inputs.chart == 'cert-manager' }}
+        env:
+          KUBECONFIG: "./constellation-admin.conf"
+          GODADDY_CREDS: ${{ secrets.GODADDY_API_KEY }}
+
+
+      - name: Deploy Mattermost OP
+        shell: bash
+        run: |
+          helm dependency update mm-infra
+          helm upgrade mm-op --install --atomic --set mattermostOperator.enabled=true --create-namespace --namespace mm-op mm-infra
+        if: ${{ inputs.chart == 'all' || inputs.chart == 'mm' }}
+        env:
+          KUBECONFIG: "./constellation-admin.conf"

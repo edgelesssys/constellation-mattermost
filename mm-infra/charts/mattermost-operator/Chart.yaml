@@ -1,0 +1,8 @@
+# The templates are taken from:
+# https://github.com/mattermost/mattermost-operator/blob/master/docs/mattermost-operator/mattermost-operator.yaml
+apiVersion: v2
+name: mattermost-operator
+description: A Helm chart to deploy the mattermost operator to it's own namespace.
+type: application
+version: 0.1.0
+appVersion: "1.18.0"

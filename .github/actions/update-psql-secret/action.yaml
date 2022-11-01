@@ -1,0 +1,14 @@
+name: Update PSQL Secret
+description: Patch the psql secret used by mattermost with the user:pw from a newly created SQL cluster.
+inputs:
+  namespace:
+    description: "In which ns is the cluster located?"
+    required: true
+    default: "staging"
+runs:
+  using: "composite"
+  steps:
+    - name: Update Secret
+      run: |
+        bash patch_db_secret.sh ${{ inputs.namespace }}
+      shell: bash

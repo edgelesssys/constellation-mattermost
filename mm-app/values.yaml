@@ -1,0 +1,22 @@
+mattermost:
+  enabled: false
+  environment: staging
+minio-tenant:
+  rootPassword: replaceme
+  accessId: replaceme
+  accessSecret: replaceme
+postgres-cluster:
+  enabled: false
+  restoreBackup: false
+  uid: 11111111-2222-3333-4444-555555555555
+  timestamp: "2022-12-01T12:40:33+01:00"
+global:
+  storageClass: mm-storage-enc-ext4
+  mainBucket: mm-main
+  mmUser: mm_user
+  teamId: edgeless
+  dbName: mattermost_main
+  # Note: This bucket name also is set in mm-infra/values.yaml. If both values don't match, no backups can be produced.
+  backupBucket: psql-backups
+  backupAccessId: replaceme
+  backupAccessSecret: replaceme
