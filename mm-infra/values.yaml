@@ -20,6 +20,11 @@ postgres-operator:
     pod_environment_configmap: psql-op/postgres-backup-config
 ingressNginx:
   enabled: false
+ingress-nginx:
+  controller:
+    service:
+      annotations:
+        service.beta.kubernetes.io/azure-load-balancer-health-probe-request-path: "/healthz"
 azurediskCsiDriver:
   enabled: false
   linux.distro: "fedora"
